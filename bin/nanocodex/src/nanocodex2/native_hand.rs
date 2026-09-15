@@ -58,6 +58,7 @@ struct Identity {
 
 struct NativeState {
     machine: AttachmentMachine,
+    directory: PathBuf,
     _lock: NativeStateLock,
 }
 
@@ -179,6 +180,7 @@ impl NativeState {
         .map_err(configuration)?;
         Ok(Self {
             machine,
+            directory: directory.to_path_buf(),
             _lock: lock,
         })
     }
@@ -272,6 +274,13 @@ async fn run_with_browser(
     let mut tools = Tools::builder()
         .without_defaults()
         .add(WorkspaceTools::new(state.machine.workspace()));
+    if let Some(mut config) = nanocodex_computer::ComputerConfig::discover() {
+        if cfg!(target_os = "linux") {
+            config.desktop_runtime = Some(state.directory.join("desktop"));
+        }
+        let computer = nanocodex_computer::ComputerTools::local(config);
+        tools = tools.add(computer.js()).add(computer.reset());
+    }
     if let Some(browser) = browser {
         tools = tools.tool(BrowserExecuteTool::from_browser(browser));
     }
